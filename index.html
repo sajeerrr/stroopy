@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stroop Challenge</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c27;
+    --border: #2a2a3d;
+    --accent: #c8ff00;
+    --text: #f0f0f0;
+    --muted: #6b6b80;
+    --green: #00e676;
+    --red: #ff4d6d;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 1rem; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 20% 50%, rgba(200,255,0,0.04) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(0,212,255,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .screen { width: 100%; max-width: 520px; display: none; animation: fadeUp 0.35s ease; }
+  .screen.active { display: flex; flex-direction: column; gap: 1.25rem; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+  .logo { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:4px; color:var(--muted); text-transform:uppercase; text-align:center; }
+  .logo span { color: var(--accent); }
+  .hero-title {
+    font-size: clamp(2.5rem,8vw,4rem); font-weight:800; line-height:1; text-align:center;
+    background: linear-gradient(135deg,var(--text) 40%,var(--accent));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; }
+
+  input[type="text"] {
+    width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:'Syne',sans-serif; font-size:1rem; padding:0.75rem 1rem;
+    outline:none; transition:border-color 0.2s;
+  }
+  input:focus { border-color: var(--accent); }
+  label { font-size:12px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:6px; }
+
+  .btn {
+    font-family:'Space Mono',monospace; font-size:13px; letter-spacing:1px; text-transform:uppercase;
+    padding:0.85rem 1.5rem; border-radius:8px; border:none; cursor:pointer;
+    transition:transform 0.1s,opacity 0.2s; width:100%;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background:var(--accent); color:#000; font-weight:700; }
+  .btn-primary:hover { opacity:0.88; }
+  .btn-ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+  .btn-ghost:hover { border-color:var(--text); color:var(--text); }
+  .btn-sm { padding:0.5rem 1rem; font-size:11px; width:auto; }
+
+  .nav { display:flex; align-items:center; justify-content:space-between; }
+  .nav-title { font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+  .home-grid { display:flex; flex-direction:column; gap:10px; }
+  .home-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+  .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .stat-box { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:0.75rem; text-align:center; }
+  .stat-box .val { font-size:1.6rem; font-weight:700; color:var(--accent); font-family:'Space Mono',monospace; }
+  .stat-box .lbl { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-top:2px; }
+
+  #arena {
+    border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);
+    min-height:170px; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:1rem; padding:2rem 1rem; position:relative; overflow:hidden;
+  }
+  #arena::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 50% 50%,rgba(200,255,0,0.03) 0%,transparent 70%); }
+  #word-display { font-size:clamp(2.8rem,10vw,4.5rem); font-weight:800; letter-spacing:3px; text-transform:uppercase; font-family:'Space Mono',monospace; position:relative; }
+  #instruction { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); position:relative; }
+
+  #timer-wrap { width:85%; height:4px; background:var(--surface2); border-radius:999px; overflow:hidden; position:relative; }
+  #timer-bar { height:100%; border-radius:999px; background:var(--accent); transition:width 0.08s linear,background 0.3s; }
+
+  #choices { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .choice-btn {
+    font-family:'Space Mono',monospace; font-size:13px; letter-spacing:1px; text-transform:uppercase;
+    padding:1rem; border-radius:8px; border:1px solid var(--border); background:var(--surface);
+    color:var(--text); cursor:pointer; transition:transform 0.1s,border-color 0.15s,background 0.15s;
+  }
+  .choice-btn:hover { border-color:var(--muted); background:var(--surface2); }
+  .choice-btn:active { transform:scale(0.97); }
+  .choice-btn.correct { background:rgba(0,230,118,0.12); border-color:var(--green); color:var(--green); }
+  .choice-btn.wrong   { background:rgba(255,77,109,0.12); border-color:var(--red); color:var(--red); }
+
+  #feedback { font-family:'Space Mono',monospace; font-size:13px; min-height:20px; text-align:center; letter-spacing:1px; }
+
+  /* ── Leaderboard ── */
+  .hs-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .hs-header-title { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+  .hs-refresh-btn { background:none; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:4px 10px; font-size:11px; font-family:'Space Mono',monospace; cursor:pointer; letter-spacing:1px; transition:color 0.15s,border-color 0.15s; }
+  .hs-refresh-btn:hover { color:var(--text); border-color:var(--muted); }
+  .hs-list { display:flex; flex-direction:column; gap:8px; max-height:400px; overflow-y:auto; }
+  .hs-row { display:flex; align-items:center; gap:12px; padding:0.75rem 1rem; background:var(--surface2); border-radius:8px; border:1px solid var(--border); }
+  .hs-row.is-you { border-color:rgba(200,255,0,0.4); background:rgba(200,255,0,0.04); }
+  .hs-rank { font-family:'Space Mono',monospace; font-size:12px; color:var(--muted); width:28px; text-align:center; flex-shrink:0; }
+  .hs-rank.gold   { color:#ffd700; font-size:18px; }
+  .hs-rank.silver { color:#c0c0c0; font-size:18px; }
+  .hs-rank.bronze { color:#cd7f32; font-size:18px; }
+  .hs-avatar { width:34px; height:34px; border-radius:50%; background:var(--surface); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; font-family:'Space Mono',monospace; color:var(--accent); flex-shrink:0; }
+  .hs-info { flex:1; min-width:0; }
+  .hs-name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:6px; }
+  .hs-meta { font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; margin-top:2px; }
+  .hs-score-col { font-family:'Space Mono',monospace; font-size:16px; color:var(--accent); font-weight:700; flex-shrink:0; }
+  .you-badge { font-size:9px; letter-spacing:1px; background:var(--accent); color:#000; border-radius:4px; padding:1px 5px; font-family:'Space Mono',monospace; }
+  .empty-state { text-align:center; color:var(--muted); font-size:14px; padding:2.5rem 1rem; font-family:'Space Mono',monospace; line-height:2; }
+  .spinner { display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted); font-size:13px; font-family:'Space Mono',monospace; padding:2.5rem; }
+  .spin { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── Result ── */
+  .result-hero { text-align:center; }
+  .result-emoji { font-size:3rem; }
+  .result-title { font-size:1.6rem; font-weight:800; margin:0.5rem 0 0.25rem; }
+  .result-sub { color:var(--muted); font-size:13px; font-family:'Space Mono',monospace; }
+  .result-score { font-size:3.5rem; font-weight:800; color:var(--accent); font-family:'Space Mono',monospace; margin:0.5rem 0; }
+
+  .player-pill { display:inline-flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:999px; padding:4px 12px 4px 4px; font-size:13px; }
+  .player-avatar { width:26px; height:26px; border-radius:50%; background:var(--accent); color:#000; font-weight:700; font-size:11px; display:flex; align-items:center; justify-content:center; font-family:'Space Mono',monospace; }
+
+  @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .flashing { animation:flash 0.3s ease; }
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:var(--surface2); }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+</style>
+</head>
+<body>
+
+<!-- NAME -->
+<div class="screen active" id="screen-name">
+  <div class="logo">stroop <span>//</span> challenge</div>
+  <div class="hero-title">What's your<br>name?</div>
+  <div class="card">
+    <label for="name-input">your name</label>
+    <input type="text" id="name-input" placeholder="enter your name..." maxlength="20" autocomplete="off">
+  </div>
+  <button class="btn btn-primary" id="btn-save-name">Let's Go →</button>
+</div>
+
+<!-- HOME -->
+<div class="screen" id="screen-home">
+  <div class="nav">
+    <div class="logo">stroop <span>//</span> challenge</div>
+    <div id="player-pill"></div>
+  </div>
+  <div class="hero-title">Stroop<br>Challenge</div>
+  <div class="home-grid">
+    <button class="btn btn-primary" id="btn-start">▶ Start Game</button>
+    <div class="home-row">
+      <button class="btn btn-ghost" id="btn-go-hs">🏆 Leaderboard</button>
+      <button class="btn btn-ghost" id="btn-go-settings">⚙ Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen" id="screen-game">
+  <div class="nav">
+    <div id="game-player-pill"></div>
+    <button class="btn btn-ghost btn-sm" id="btn-quit">✕ quit</button>
+  </div>
+  <div class="stats-row">
+    <div class="stat-box"><div class="val" id="stat-score">0</div><div class="lbl">score</div></div>
+    <div class="stat-box"><div class="val" id="stat-round">0/20</div><div class="lbl">round</div></div>
+    <div class="stat-box"><div class="val" id="stat-streak">0</div><div class="lbl">streak 🔥</div></div>
+  </div>
+  <div id="arena">
+    <div id="word-display" style="color:var(--text)">—</div>
+    <div id="timer-wrap"><div id="timer-bar"></div></div>
+    <div id="instruction">get ready</div>
+  </div>
+  <div id="choices"></div>
+  <div id="feedback">&nbsp;</div>
+</div>
+
+<!-- RESULT -->
+<div class="screen" id="screen-result">
+  <div class="result-hero card">
+    <div class="result-emoji" id="result-emoji">🎉</div>
+    <div class="result-title" id="result-title">Well played!</div>
+    <div class="result-score" id="result-score">0</div>
+    <div class="result-sub" id="result-sub">pts</div>
+  </div>
+  <button class="btn btn-primary" id="btn-play-again">▶ Play Again</button>
+  <div class="home-row">
+    <button class="btn btn-ghost" id="btn-result-hs">🏆 Leaderboard</button>
+    <button class="btn btn-ghost" id="btn-result-home">⌂ Home</button>
+  </div>
+</div>
+
+<!-- LEADERBOARD -->
+<div class="screen" id="screen-hs">
+  <div class="nav">
+    <div class="nav-title">🏆 Global Leaderboard</div>
+    <button class="btn btn-ghost btn-sm" id="btn-hs-back">← back</button>
+  </div>
+  <div class="card">
+    <div class="hs-header">
+      <div class="hs-header-title">top 10 · all time · best score per player</div>
+      <button class="hs-refresh-btn" id="btn-hs-refresh">↻ refresh</button>
+    </div>
+    <div class="hs-list" id="hs-list">
+      <div class="spinner"><div class="spin"></div>&nbsp;loading...</div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="screen" id="screen-settings">
+  <div class="nav">
+    <div class="nav-title">⚙ Settings</div>
+    <button class="btn btn-ghost btn-sm" id="btn-settings-back">← back</button>
+  </div>
+  <div class="card" style="display:flex;flex-direction:column;gap:0.75rem;">
+    <label for="setting-name">change your name</label>
+    <input type="text" id="setting-name" placeholder="enter new name..." maxlength="20" autocomplete="off">
+  </div>
+  <button class="btn btn-primary" id="btn-save-settings">Save</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  GLOBAL LEADERBOARD via JSONBlob (free, no auth, public API)
+//  https://jsonblob.com — stores a JSON array, shared globally.
+//
+//  HOW IT WORKS:
+//  1. On first ever game finish, a new blob is created and its
+//     ID is saved to localStorage as 'stroop_blob_id'.
+//  2. All players on the same hosted site share ONE blob ID.
+//     To make this truly global across all devices, after the
+//     first game is played on your hosted site:
+//       - Open DevTools → Application → Local Storage
+//       - Copy the value of 'stroop_blob_id'
+//       - Paste it as BLOB_ID below and re-upload the file
+//  3. The leaderboard shows top 10 best scores per player.
+// ═══════════════════════════════════════════════════════════════
+
+// ▼▼▼ PASTE YOUR BLOB ID HERE AFTER FIRST DEPLOY ▼▼▼
+const BLOB_ID = '';
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+const API = 'https://jsonblob.com/api/jsonBlob';
+const BLOB_STORAGE_KEY = 'stroop_blob_id';
+const ROUNDS = 20;
+const SECS   = 2;
+
+const COLORS = [
+  { name:'red',    hex:'#ff4d6d' },
+  { name:'blue',   hex:'#00d4ff' },
+  { name:'green',  hex:'#00e676' },
+  { name:'yellow', hex:'#ffd600' },
+  { name:'purple', hex:'#c77dff' },
+  { name:'orange', hex:'#ff9100' },
+];
+
+let playerName = localStorage.getItem('stroop_name') || '';
+let activeBlobId = BLOB_ID || localStorage.getItem(BLOB_STORAGE_KEY) || '';
+let score = 0, round = 0, streak = 0, answered = false, timeLeft = 0;
+let currentInk = null, timerInterval = null, nextRoundTimer = null;
+
+// ── API helpers ──────────────────────────────────────────────
+async function getScores() {
+  if (!activeBlobId) return [];
+  try {
+    const r = await fetch(`${API}/${activeBlobId}`, { headers:{ 'Accept':'application/json' } });
+    if (!r.ok) return [];
+    return await r.json();
+  } catch { return []; }
+}
+
+async function putScores(scores) {
+  if (!activeBlobId) return false;
+  try {
+    const r = await fetch(`${API}/${activeBlobId}`, {
+      method:'PUT',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(scores)
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function createBlob(scores) {
+  try {
+    const r = await fetch(API, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(scores)
+    });
+    if (!r.ok) return null;
+    const loc = r.headers.get('location') || '';
+    return loc.split('/').pop() || null;
+  } catch { return null; }
+}
+
+async function submitScore(name, newScore) {
+  let scores = [];
+  if (activeBlobId) {
+    scores = await getScores();
+  }
+
+  // Keep best score per player name (case-insensitive match)
+  const idx = scores.findIndex(e => e.name.toLowerCase() === name.toLowerCase());
+  if (idx >= 0) {
+    if (newScore > scores[idx].score) {
+      scores[idx] = { name: scores[idx].name, score: newScore, date: Date.now() };
+    }
+  } else {
+    scores.push({ name, score: newScore, date: Date.now() });
+  }
+
+  scores.sort((a, b) => b.score - a.score);
+  scores = scores.slice(0, 100);
+
+  if (activeBlobId) {
+    await putScores(scores);
+  } else {
+    const newId = await createBlob(scores);
+    if (newId) {
+      activeBlobId = newId;
+      localStorage.setItem(BLOB_STORAGE_KEY, newId);
+      console.info('✅ Stroop blob created:', newId, '— hardcode this in BLOB_ID for global sharing.');
+    }
+  }
+}
+
+// ── Utils ────────────────────────────────────────────────────
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function saveName() { localStorage.setItem('stroop_name', playerName); }
+
+function initials(name) {
+  return (name || '?').trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function pillHTML(name) {
+  return `<div class="player-pill"><div class="player-avatar">${initials(name)}</div><span>${esc(name)}</span></div>`;
+}
+
+// ── Screens ──────────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+function goHome() {
+  document.getElementById('player-pill').innerHTML = pillHTML(playerName);
+  show('home');
+}
+
+// ── Name screen ──────────────────────────────────────────────
+if (playerName) {
+  document.addEventListener('DOMContentLoaded', () => goHome());
+}
+
+document.getElementById('btn-save-name').onclick = () => {
+  const v = document.getElementById('name-input').value.trim();
+  if (!v) { document.getElementById('name-input').focus(); return; }
+  playerName = v; saveName(); goHome();
+};
+document.getElementById('name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-save-name').click();
+});
+
+// ── Home ─────────────────────────────────────────────────────
+document.getElementById('btn-start').onclick       = startGame;
+document.getElementById('btn-go-hs').onclick       = openHS;
+document.getElementById('btn-go-settings').onclick = openSettings;
+
+// ── Settings ─────────────────────────────────────────────────
+function openSettings() {
+  document.getElementById('setting-name').value = playerName;
+  show('settings');
+}
+document.getElementById('btn-settings-back').onclick = goHome;
+document.getElementById('btn-save-settings').onclick = () => {
+  const n = document.getElementById('setting-name').value.trim();
+  if (n) { playerName = n; saveName(); }
+  goHome();
+};
+
+// ── Leaderboard ──────────────────────────────────────────────
+async function openHS() {
+  show('hs');
+  await loadAndRender();
+}
+
+async function loadAndRender() {
+  const list = document.getElementById('hs-list');
+  list.innerHTML = '<div class="spinner"><div class="spin"></div>&nbsp;loading global scores...</div>';
+  const scores = await getScores();
+  renderHS(scores);
+}
+
+function renderHS(scores) {
+  const list = document.getElementById('hs-list');
+  const top10 = scores.slice(0, 10);
+  if (!top10.length) {
+    list.innerHTML = '<div class="empty-state">no scores yet —<br>be the first to play! 🎮</div>';
+    return;
+  }
+  list.innerHTML = top10.map((e, i) => {
+    const rc = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    const rl = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+    const you = e.name.toLowerCase() === playerName.toLowerCase();
+    return `<div class="hs-row${you ? ' is-you' : ''}">
+      <div class="hs-rank ${rc}">${rl}</div>
+      <div class="hs-avatar">${initials(e.name)}</div>
+      <div class="hs-info">
+        <div class="hs-name">${esc(e.name)}${you ? '<span class="you-badge">you</span>' : ''}</div>
+        <div class="hs-meta">${timeAgo(e.date)}</div>
+      </div>
+      <div class="hs-score-col">${e.score}</div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('btn-hs-back').onclick    = goHome;
+document.getElementById('btn-result-hs').onclick  = openHS;
+document.getElementById('btn-hs-refresh').onclick = loadAndRender;
+
+// ── Game ─────────────────────────────────────────────────────
+function startGame() {
+  score = 0; round = 0; streak = 0;
+  document.getElementById('game-player-pill').innerHTML = pillHTML(playerName);
+  document.getElementById('stat-score').textContent  = 0;
+  document.getElementById('stat-round').textContent  = '0/' + ROUNDS;
+  document.getElementById('stat-streak').textContent = 0;
+  document.getElementById('feedback').innerHTML = '&nbsp;';
+  document.getElementById('choices').innerHTML  = '';
+  show('game');
+  setTimeout(nextRound, 400);
+}
+
+function nextRound() {
+  if (round >= ROUNDS) { endGame(); return; }
+  answered = false;
+  round++;
+  document.getElementById('stat-round').textContent = round + '/' + ROUNDS;
+  document.getElementById('feedback').innerHTML = '&nbsp;';
+
+  const sh = shuffle(COLORS);
+  const wordColor = sh[0];
+  currentInk = sh[1];
+
+  const wd = document.getElementById('word-display');
+  wd.classList.add('flashing');
+  setTimeout(() => wd.classList.remove('flashing'), 300);
+  wd.textContent = wordColor.name.toUpperCase();
+  wd.style.color = currentInk.hex;
+  document.getElementById('instruction').textContent = 'what color is the text printed in?';
+
+  const wrongs  = shuffle(COLORS.filter(c => c.name !== currentInk.name)).slice(0, 3);
+  const choices = shuffle([currentInk, ...wrongs]);
+
+  const choicesEl = document.getElementById('choices');
+  choicesEl.innerHTML = '';
+  choices.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = c.name;
+    btn.onclick = () => handleAnswer(btn, c);
+    choicesEl.appendChild(btn);
+  });
+
+  timeLeft = SECS * 1000;
+  const bar = document.getElementById('timer-bar');
+  bar.style.width = '100%';
+  bar.style.background = 'var(--accent)';
+
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft -= 50;
+    const pct = Math.max(0, timeLeft / (SECS * 1000) * 100);
+    bar.style.width = pct + '%';
+    if (pct < 40) bar.style.background = '#ff9100';
+    if (pct < 15) bar.style.background = 'var(--red)';
+    if (timeLeft <= 0) { clearInterval(timerInterval); if (!answered) timeOut(); }
+  }, 50);
+}
+
+function lockBtns() {
+  document.querySelectorAll('.choice-btn').forEach(b => b.style.pointerEvents = 'none');
+}
+
+function handleAnswer(btn, chosen) {
+  if (answered) return;
+  answered = true;
+  clearInterval(timerInterval);
+  lockBtns();
+  const fb = document.getElementById('feedback');
+  if (chosen.name === currentInk.name) {
+    btn.classList.add('correct');
+    const bonus = Math.ceil(timeLeft / 200);
+    score += 10 + bonus;
+    streak++;
+    fb.style.color = 'var(--green)';
+    fb.textContent = streak >= 3 ? `🔥 ON FIRE! +${10+bonus}` : `✓ CORRECT! +${10+bonus}`;
+  } else {
+    btn.classList.add('wrong');
+    document.querySelectorAll('.choice-btn').forEach(b => {
+      if (b.textContent === currentInk.name) b.classList.add('correct');
+    });
+    streak = 0;
+    fb.style.color = 'var(--red)';
+    fb.textContent = `✗ WRONG — it was ${currentInk.name}`;
+  }
+  document.getElementById('stat-score').textContent  = score;
+  document.getElementById('stat-streak').textContent = streak;
+  nextRoundTimer = setTimeout(nextRound, 1100);
+}
+
+function timeOut() {
+  answered = true;
+  lockBtns();
+  document.querySelectorAll('.choice-btn').forEach(b => {
+    if (b.textContent === currentInk.name) b.classList.add('correct');
+  });
+  streak = 0;
+  document.getElementById('stat-streak').textContent = 0;
+  const fb = document.getElementById('feedback');
+  fb.style.color = 'var(--red)';
+  fb.textContent = `⏱ TIME'S UP — it was ${currentInk.name}`;
+  nextRoundTimer = setTimeout(nextRound, 1200);
+}
+
+async function endGame() {
+  clearInterval(timerInterval);
+  clearTimeout(nextRoundTimer);
+
+  const pct = score / (ROUNDS * 20) * 100;
+  document.getElementById('result-emoji').textContent  = pct >= 80 ? '🏆' : pct >= 55 ? '🎉' : pct >= 35 ? '👍' : '😅';
+  document.getElementById('result-title').textContent  = pct >= 80 ? 'Stroop Master!' : pct >= 55 ? 'Great Round!' : pct >= 35 ? 'Good Effort!' : 'Keep Practising!';
+  document.getElementById('result-score').textContent  = score;
+  document.getElementById('result-sub').textContent    = `pts · ${ROUNDS} rounds · submitting score...`;
+  show('result');
+
+  await submitScore(playerName, score);
+  document.getElementById('result-sub').textContent = `pts · ${ROUNDS} rounds · score saved ✓`;
+}
+
+document.getElementById('btn-quit').onclick = () => {
+  clearInterval(timerInterval);
+  clearTimeout(nextRoundTimer);
+  goHome();
+};
+document.getElementById('btn-play-again').onclick  = startGame;
+document.getElementById('btn-result-home').onclick = goHome;
+</script>
+</body>
+</html>
