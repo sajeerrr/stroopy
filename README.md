@@ -1,6 +1,6 @@
 # 🎨 Stroop Challenge
 
-A fast-paced browser game based on the Stroop effect — a color word is shown in a mismatched ink color, and you must identify the **ink color**, not the word.
+A fast-paced browser game based on the **Stroop effect** — a color word appears in a mismatched ink color, and you must identify the **ink color**, not what the word says.
 
 ---
 
@@ -9,7 +9,7 @@ A fast-paced browser game based on the Stroop effect — a color word is shown i
 - 20 rounds per game with a 2-second timer per round
 - Bonus points for fast answers
 - Streak counter with fire mode 🔥
-- Global leaderboard — top 10 best scores across all players
+- Global leaderboard — top 10 best scores across all players (powered by Firebase)
 - Player name saved in browser (asked only once)
 - Change name anytime from Settings
 - Single HTML file — no install, no build step
@@ -18,43 +18,37 @@ A fast-paced browser game based on the Stroop effect — a color word is shown i
 
 ## 🌍 Global Leaderboard Setup
 
-The leaderboard uses [JSONBlob](https://jsonblob.com) (free, no account needed).
+The leaderboard uses [Firebase Realtime Database](https://firebase.google.com) (free tier, no credit card needed).
 
-**After deploying, do this once:**
+**One-time setup (~2 minutes):**
 
-1. Open your hosted site and play one full game
-2. Open DevTools → Application → Local Storage
-3. Copy the value of `stroop_blob_id`
-4. Open `index.html` and find this line:
-   ```js
-   const BLOB_ID = '';
+1. Go to [console.firebase.google.com](https://console.firebase.google.com)
+2. Create a project (any name — disable Analytics if prompted)
+3. Go to **Build → Realtime Database → Create Database → Start in Test mode**
+4. Copy your database URL — it looks like:
    ```
-5. Paste your ID:
-   ```js
-   const BLOB_ID = 'your-id-here';
+   https://your-project-default-rtdb.firebaseio.com
    ```
-6. Re-upload the file
+5. Open `index.html` and find this line:
+   ```js
+   const FIREBASE_URL = 'YOUR_FIREBASE_URL';
+   ```
+6. Paste your URL:
+   ```js
+   const FIREBASE_URL = 'https://your-project-default-rtdb.firebaseio.com';
+   ```
+7. Re-upload the file
 
-Now every visitor shares the same global leaderboard.
+Every player who visits your hosted site will now share the same global leaderboard. Scores are stored with one entry per player name — only their personal best is kept.
 
 ---
 
 ## 🏗️ Hosting
 
-**Netlify Drop** (easiest)
-1. Go to [netlify.com/drop](https://netlify.com/drop)
-2. Drag and drop `index.html`
-3. Done — live URL instantly
-
 **Vercel**
 1. Go to [vercel.com/new](https://vercel.com/new)
 2. Upload `index.html`
 3. Deploy
-
-**GitHub Pages**
-1. Push `index.html` to a GitHub repo
-2. Go to Settings → Pages → select branch
-3. Your site is live at `https://yourusername.github.io/repo-name`
 
 ---
 
@@ -69,10 +63,10 @@ README.md    — this file
 
 ## 🛠️ Tech
 
-- Vanilla HTML, CSS, JavaScript — no frameworks
-- [JSONBlob API](https://jsonblob.com/api) — global score storage
+- Vanilla HTML, CSS, JavaScript — zero dependencies, no frameworks
+- [Firebase Realtime Database](https://firebase.google.com) — global score storage (best score per player)
 - [Google Fonts](https://fonts.google.com) — Space Mono + Syne
-- localStorage — saves player name per browser
+- `localStorage` — saves player name between sessions
 
 ---
 
@@ -81,5 +75,12 @@ README.md    — this file
 1. Enter your name (saved for future visits)
 2. A color word appears in a mismatched ink color
 3. Tap the **ink color** — not what the word says
-4. Answer before the timer runs out
-5. Score is based on accuracy + speed
+4. Answer before the 2-second timer runs out
+5. Score is based on accuracy + speed (faster answers earn bonus points)
+6. Chain correct answers for a streak 🔥
+
+---
+
+## 🧠 What Is the Stroop Effect?
+
+The Stroop effect is a psychological phenomenon where your brain takes longer to process the ink color of a word when the word itself names a different color. For example, seeing <span style="color:red">**BLUE**</span> written in red ink creates cognitive interference — your reading instinct fights your color perception. This game trains you to override that instinct under time pressure.
