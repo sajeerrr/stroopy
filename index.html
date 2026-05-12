@@ -201,8 +201,8 @@
     <button class="btn btn-ghost btn-sm" id="btn-hs-back">← back</button>
   </div>
   <div class="hs-tabs">
-    <button class="hs-tab active" id="tab-alltime" onclick="switchTab('alltime')">All Time</button>
-    <button class="hs-tab" id="tab-daily" onclick="switchTab('daily')">Today</button>
+    <button class="hs-tab active" id="tab-daily" onclick="switchTab('daily')">Today</button>
+    <button class="hs-tab" id="tab-alltime" onclick="switchTab('alltime')">All Time</button>
   </div>
   <div class="card">
     <div class="hs-header">
@@ -263,7 +263,7 @@ const COLORS = [
 let playerName = localStorage.getItem('stroop_name') || '';
 let score=0,round=0,streak=0,answered=false,timeLeft=0;
 let currentInk=null,timerInterval=null,nextRoundTimer=null;
-let activeTab='alltime';
+let activeTab='daily';
 
 // Returns today's date key e.g. "2025-05-12"
 function todayKey(){
