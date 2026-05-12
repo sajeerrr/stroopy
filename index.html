@@ -97,6 +97,22 @@
   ::-webkit-scrollbar{width:4px}
   ::-webkit-scrollbar-track{background:var(--surface2)}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+  #share-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;align-items:center;justify-content:center;padding:1rem}
+  #share-modal.open{display:flex}
+  .hs-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .hs-tab{font-family:'Space Mono',monospace;font-size:12px;letter-spacing:1px;text-transform:uppercase;
+    padding:.65rem;border-radius:8px;border:1px solid var(--border);background:transparent;
+    color:var(--muted);cursor:pointer;transition:all .15s}
+  .hs-tab:hover{color:var(--text);border-color:var(--muted)}
+  .hs-tab.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+  .daily-reset-note{text-align:center;font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:1px}
+  .share-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:100%;max-width:420px;display:flex;flex-direction:column;gap:1rem}
+  .share-box-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+  #share-canvas{width:100%;border-radius:10px;display:block}
+  .share-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .share-act-btn{background:transparent;color:var(--muted);border:1px solid var(--border);font-family:'Space Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:.65rem .5rem;border-radius:8px;cursor:pointer;transition:color .15s,border-color .15s,background .15s;text-align:center}
+  .share-act-btn:hover{color:var(--text);border-color:var(--muted)}
+  .share-act-btn.done{color:var(--green);border-color:var(--green)}
 </style>
 </head>
 <body>
@@ -157,9 +173,24 @@
     <div class="result-sub" id="result-sub">pts</div>
   </div>
   <button class="btn btn-primary" id="btn-play-again">▶ Play Again</button>
+  <button class="btn btn-ghost" id="btn-share-open">📤 Share Result</button>
   <div class="home-row">
     <button class="btn btn-ghost" id="btn-result-hs">🏆 Leaderboard</button>
     <button class="btn btn-ghost" id="btn-result-home">⌂ Home</button>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div id="share-modal">
+  <div class="share-box">
+    <div class="share-box-title">📤 Share your result</div>
+    <canvas id="share-canvas" width="800" height="420"></canvas>
+    <div class="share-actions">
+      <button class="share-act-btn" id="btn-share-download">⬇ save image</button>
+      <button class="share-act-btn" id="btn-share-copy-link">🔗 copy link</button>
+      <button class="share-act-btn" id="btn-share-native">↗ share</button>
+    </div>
+    <button class="btn btn-ghost" id="btn-share-close" style="margin-top:-.25rem">close</button>
   </div>
 </div>
 
@@ -169,14 +200,21 @@
     <div class="nav-title">🏆 Global Leaderboard</div>
     <button class="btn btn-ghost btn-sm" id="btn-hs-back">← back</button>
   </div>
+  <div class="hs-tabs">
+    <button class="hs-tab active" id="tab-alltime" onclick="switchTab('alltime')">All Time</button>
+    <button class="hs-tab" id="tab-daily" onclick="switchTab('daily')">Today</button>
+  </div>
   <div class="card">
     <div class="hs-header">
-      <div class="hs-header-title">top 10 · all time · best score per player</div>
+      <div class="hs-header-title" id="hs-tab-label">top 10 · all time · best score per player</div>
       <button class="hs-refresh-btn" id="btn-hs-refresh">↻ refresh</button>
     </div>
     <div class="hs-list" id="hs-list">
       <div class="spinner"><div class="spin"></div>&nbsp;loading...</div>
     </div>
+  </div>
+  <div class="daily-reset-note" id="daily-reset-note" style="display:none">
+    🕛 resets daily at midnight
   </div>
 </div>
 
@@ -207,7 +245,8 @@
 
 const FIREBASE_URL = 'https://stroopy-98e20-default-rtdb.asia-southeast1.firebasedatabase.app';
 
-const SCORES_ENDPOINT = FIREBASE_URL + '/leaderboard.json';
+const SCORES_ENDPOINT   = FIREBASE_URL + '/leaderboard.json';
+const DAILY_BASE        = FIREBASE_URL + '/daily';
 
 const ROUNDS = 20;
 const SECS   = 2;
@@ -224,6 +263,13 @@ const COLORS = [
 let playerName = localStorage.getItem('stroop_name') || '';
 let score=0,round=0,streak=0,answered=false,timeLeft=0;
 let currentInk=null,timerInterval=null,nextRoundTimer=null;
+let activeTab='alltime';
+
+// Returns today's date key e.g. "2025-05-12"
+function todayKey(){
+  const d=new Date();
+  return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
 // ── Firebase helpers ────────────────────────────────────────
 async function getScores() {
@@ -232,30 +278,71 @@ async function getScores() {
     if (!r.ok) return [];
     const data = await r.json();
     if (!data) return [];
-    // Firebase returns an object keyed by push-id; convert to array
     return Object.values(data);
   } catch(e) { return []; }
 }
 
-async function submitScore(name, newScore) {
+async function getDailyScores() {
   try {
-    // Read existing, update best per player, write back
+    const key = todayKey();
+    const r = await fetch(`${DAILY_BASE}/${key}.json`);
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (!data) return [];
+    return Object.values(data);
+  } catch(e) { return []; }
+}
+
+// Clean up old daily entries (keep only last 7 days) — runs silently
+async function cleanOldDays() {
+  try {
+    const r = await fetch(`${DAILY_BASE}.json`);
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!data) return;
+    const today = new Date();
+    const keys = Object.keys(data);
+    for (const k of keys) {
+      const d = new Date(k);
+      if ((today - d) > 7 * 86400000) {
+        fetch(`${DAILY_BASE}/${k}.json`, {method:'DELETE'}).catch(()=>{});
+      }
+    }
+  } catch(e) {}
+}
+
+async function submitScore(name, newScore) {
+  const key = name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+
+  // ── All-time ──
+  try {
     const r = await fetch(SCORES_ENDPOINT);
     let data = r.ok ? (await r.json() || {}) : {};
-
-    // Use player name as key (sanitised) so each player has one entry
-    const key = name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    const existing = data[key];
-    if (!existing || newScore > existing.score) {
+    const ex = data[key];
+    if (!ex || newScore > ex.score) {
       data[key] = { name, score: newScore, date: Date.now() };
     }
-
     await fetch(SCORES_ENDPOINT, {
-      method: 'PUT',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(data)
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
     });
   } catch(e) { console.warn('Score save failed:', e); }
+
+  // ── Daily ──
+  try {
+    const dayKey = todayKey();
+    const endpoint = `${DAILY_BASE}/${dayKey}.json`;
+    const r2 = await fetch(endpoint);
+    let dayData = r2.ok ? (await r2.json() || {}) : {};
+    const ex2 = dayData[key];
+    if (!ex2 || newScore > ex2.score) {
+      dayData[key] = { name, score: newScore, date: Date.now() };
+    }
+    await fetch(endpoint, {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(dayData)
+    });
+  } catch(e) { console.warn('Daily score save failed:', e); }
+
+  cleanOldDays();
 }
 
 // ── Utils ───────────────────────────────────────────────────
@@ -320,8 +407,16 @@ document.getElementById('btn-save-settings').onclick=()=>{
 // ── Leaderboard ─────────────────────────────────────────────
 async function openHS(){show('hs');await loadAndRender();}
 
+function switchTab(tab){
+  activeTab=tab;
+  document.getElementById('tab-alltime').classList.toggle('active', tab==='alltime');
+  document.getElementById('tab-daily').classList.toggle('active',   tab==='daily');
+  loadAndRender();
+}
+
 async function loadAndRender(){
   const list=document.getElementById('hs-list');
+  const note=document.getElementById('daily-reset-note');
   list.innerHTML='<div class="spinner"><div class="spin"></div>&nbsp;loading global scores...</div>';
 
   if(!FIREBASE_URL||FIREBASE_URL==='YOUR_FIREBASE_URL'){
@@ -329,14 +424,26 @@ async function loadAndRender(){
     return;
   }
 
-  const scores=await getScores();
-  renderHS(scores);
+  if(activeTab==='daily'){
+    document.getElementById('hs-tab-label').textContent="today's top 10 · resets at midnight";
+    note.style.display='block';
+    const scores=await getDailyScores();
+    renderHS(scores);
+  } else {
+    document.getElementById('hs-tab-label').textContent='top 10 · all time · best score per player';
+    note.style.display='none';
+    const scores=await getScores();
+    renderHS(scores);
+  }
 }
 
 function renderHS(scores){
   const list=document.getElementById('hs-list');
   if(!scores.length){
-    list.innerHTML='<div class="empty-state">no scores yet —<br>be the first to play! 🎮</div>';
+    const msg=activeTab==='daily'
+      ? 'no scores today yet —<br>be the first to play! 🎮'
+      : 'no scores yet —<br>be the first to play! 🎮';
+    list.innerHTML=`<div class="empty-state">${msg}</div>`;
     return;
   }
   const top10=[...scores].sort((a,b)=>b.score-a.score).slice(0,10);
@@ -444,8 +551,11 @@ function timeOut(){
 async function endGame(){
   clearInterval(timerInterval);clearTimeout(nextRoundTimer);
   const pct=score/(ROUNDS*20)*100;
-  document.getElementById('result-emoji').textContent =pct>=80?'🏆':pct>=55?'🎉':pct>=35?'👍':'😅';
-  document.getElementById('result-title').textContent =pct>=80?'Stroop Master!':pct>=55?'Great Round!':pct>=35?'Good Effort!':'Keep Practising!';
+  lastScore=score;
+  lastEmoji=pct>=80?'🏆':pct>=55?'🎉':pct>=35?'👍':'😅';
+  lastTitle=pct>=80?'Stroop Master!':pct>=55?'Great Round!':pct>=35?'Good Effort!':'Keep Practising!';
+  document.getElementById('result-emoji').textContent =lastEmoji;
+  document.getElementById('result-title').textContent =lastTitle;
   document.getElementById('result-score').textContent =score;
   document.getElementById('result-sub').textContent   =`pts · ${ROUNDS} rounds · saving score...`;
   show('result');
@@ -456,6 +566,155 @@ async function endGame(){
 document.getElementById('btn-quit').onclick=()=>{clearInterval(timerInterval);clearTimeout(nextRoundTimer);goHome();};
 document.getElementById('btn-play-again').onclick =startGame;
 document.getElementById('btn-result-home').onclick=goHome;
+
+// ── Share card ───────────────────────────────────────────────
+let lastScore=0, lastEmoji='🎉', lastTitle='';
+
+function openShareModal(){
+  drawShareCard();
+  document.getElementById('share-modal').classList.add('open');
+}
+
+document.getElementById('btn-share-open').onclick  = openShareModal;
+document.getElementById('btn-share-close').onclick = ()=>document.getElementById('share-modal').classList.remove('open');
+document.getElementById('share-modal').addEventListener('click', e=>{
+  if(e.target===document.getElementById('share-modal')) document.getElementById('share-modal').classList.remove('open');
+});
+
+function drawShareCard(){
+  const canvas = document.getElementById('share-canvas');
+  const ctx    = canvas.getContext('2d');
+  const W=800, H=420;
+  canvas.width=W; canvas.height=H;
+
+  // Background
+  ctx.fillStyle='#0a0a0f';
+  ctx.fillRect(0,0,W,H);
+
+  // Subtle gradient overlay
+  const grad=ctx.createRadialGradient(W*.2,H*.5,0,W*.2,H*.5,W*.6);
+  grad.addColorStop(0,'rgba(200,255,0,0.07)');
+  grad.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+
+  const grad2=ctx.createRadialGradient(W*.85,H*.2,0,W*.85,H*.2,W*.5);
+  grad2.addColorStop(0,'rgba(0,212,255,0.05)');
+  grad2.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=grad2;
+  ctx.fillRect(0,0,W,H);
+
+  // Border
+  ctx.strokeStyle='#2a2a3d';
+  ctx.lineWidth=1.5;
+  roundRect(ctx,12,12,W-24,H-24,16);
+  ctx.stroke();
+
+  // Logo
+  ctx.font='bold 13px "Space Mono",monospace';
+  ctx.fillStyle='#6b6b80';
+  ctx.letterSpacing='4px';
+  ctx.fillText('STROOP // CHALLENGE',48,64);
+  ctx.letterSpacing='0px';
+
+  // Accent dot
+  ctx.fillStyle='#c8ff00';
+  ctx.beginPath();ctx.arc(42,59,5,0,Math.PI*2);ctx.fill();
+
+  // Big emoji
+  ctx.font='72px serif';
+  ctx.fillText(lastEmoji, 48, 185);
+
+  // Score
+  ctx.font='bold 96px "Space Mono",monospace';
+  ctx.fillStyle='#c8ff00';
+  ctx.fillText(lastScore, 48, 290);
+
+  // pts label
+  ctx.font='16px "Space Mono",monospace';
+  ctx.fillStyle='#6b6b80';
+  ctx.fillText('PTS · '+ROUNDS+' ROUNDS', 52, 322);
+
+  // Player name
+  ctx.font='bold 28px "Syne",sans-serif';
+  ctx.fillStyle='#f0f0f0';
+  ctx.fillText(playerName, 48, 375);
+
+  // Right side — title + challenge text
+  ctx.font='bold 36px "Syne",sans-serif';
+  ctx.fillStyle='#f0f0f0';
+  ctx.textAlign='right';
+  wrapText(ctx, lastTitle, W-48, 180, 320, 44);
+
+  ctx.font='18px "Space Mono",monospace';
+  ctx.fillStyle='#6b6b80';
+  ctx.fillText('can you beat me?', W-48, 300);
+
+  // Site URL
+  ctx.font='13px "Space Mono",monospace';
+  ctx.fillStyle='rgba(200,255,0,0.6)';
+  ctx.fillText(window.location.hostname, W-48, 375);
+
+  ctx.textAlign='left';
+}
+
+function wrapText(ctx,text,x,y,maxW,lineH){
+  const words=text.split(' ');let line='';
+  for(let i=0;i<words.length;i++){
+    const test=line+words[i]+' ';
+    if(ctx.measureText(test).width>maxW&&i>0){
+      ctx.fillText(line.trim(),x,y);line=words[i]+' ';y+=lineH;
+    }else{line=test;}
+  }
+  ctx.fillText(line.trim(),x,y);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+  ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);
+  ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);
+  ctx.arcTo(x,y,x+r,y,r);ctx.closePath();
+}
+
+document.getElementById('btn-share-download').onclick=()=>{
+  const a=document.createElement('a');
+  a.download='stroop-result.png';
+  a.href=document.getElementById('share-canvas').toDataURL('image/png');
+  a.click();
+};
+
+document.getElementById('btn-share-copy-link').onclick=async()=>{
+  const url=window.location.href;
+  await navigator.clipboard.writeText(url).catch(()=>{});
+  const btn=document.getElementById('btn-share-copy-link');
+  btn.textContent='✓ copied!';btn.classList.add('done');
+  setTimeout(()=>{btn.textContent='🔗 copy link';btn.classList.remove('done');},2000);
+};
+
+document.getElementById('btn-share-native').onclick=async()=>{
+  const canvas=document.getElementById('share-canvas');
+  const text=`I scored ${lastScore} pts in Stroop Challenge — can you beat me? 🎨`;
+  const url=window.location.href;
+  if(navigator.share){
+    try{
+      canvas.toBlob(async blob=>{
+        const file=new File([blob],'stroop-result.png',{type:'image/png'});
+        if(navigator.canShare&&navigator.canShare({files:[file]})){
+          await navigator.share({title:'Stroop Challenge',text,files:[file],url});
+        }else{
+          await navigator.share({title:'Stroop Challenge',text,url});
+        }
+      },'image/png');
+    }catch(e){}
+  }else{
+    // Fallback: copy text
+    await navigator.clipboard.writeText(`${text} ${url}`).catch(()=>{});
+    const btn=document.getElementById('btn-share-native');
+    btn.textContent='✓ copied!';btn.classList.add('done');
+    setTimeout(()=>{btn.textContent='↗ share';btn.classList.remove('done');},2000);
+  }
+};
 </script>
 </body>
 </html>
